@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js" type="text/javascript"></script>
+	<style type="text/css" media="screen">
+		body{
+			margin-top: 30px;
+		}
+		#messageArea{display: none;}
+	</style>
+</head>
+<body>
+<div class="container">
+	
+	<!-- user form  -->
+	<div id="userFormArea" class="row">
+		<div class="col-md-12">
+			<form id="userForm">
+				<div class="form-group">
+				<label>Enter Username</label>
+					<input type="text" class="form-control" id="username" />
+					<br/>
+					<input type="submit" value="Login" class="btn btn-primary"/>
+				</div>
+			</form>
+		</div>
+	</div>
+	<!-- message form  -->
+	<div id="messageArea" class="row">
+		<div class="col-md-4">
+			
+			<div class="well">
+				<h3>Logged in as: <span id="logged_in"></span></h3>
+				<h3>Online users</h3>
+				<ul class="grp_users list-group" id="users"></ul> 
+
+				<h3>Groups:</h3>
+				<ul class="grp_users1 list-group" id="groups"></ul>
+				
+			</div>
+
+
+		</div>
+
+		
+
+		<div class="col-md-8">
+		<div id="oldermsg">
+		</div>
+		<div id="chat_history">
+			<form id="chat_historyFrom">
+				<div class="form-group">
+					<input type="hidden" name="to_user1" id="to_user1" value="" />
+					<br/>
+					<input type="hidden" name="from_user1" id="from_user1" value="" />
+
+					<button id="btn_history" name="btn_history" value="btn_history">Show Oldermessages</button>
+				</div>
+			</form>
+		</div>
+
+
+		<label>To :</label><span id="to_user"></span>
+			<div class="chat" id="chat"></div>
+			<form id="messageFrom">
+				<div class="form-group">
+				<label>Enter Message</label>
+					<textarea class="form-control" id="message"></textarea>
+					<input type="hidden" name="unameId" id="unameId" value="" />
+					<input type="hidden" name="groupId" id="groupId" value="" />
+
+					<br/>
+					<input type="submit" value="Send Message" class="btn btn-primary"/>
+				</div>
+			</form>
+		</div>
+
+
+		<!-- single chat  -->
+		<!-- <div class="col-md-8" id="private_chat">
+			<div class="privatechat" id="privatechat"></div>
+			<form id="privateFrom">
+				<div class="form-group">
+				<label>Enter Message:<span id="uname"></span></label>
+					<textarea class="form-control" id="pvtmessage"></textarea>
+					<br/>
+					<input type="submit" value="Send Message" class="btn btn-primary"/>
+				</div>
+			</form>
+		</div> -->
+		<!-- // -->
+	</div>
+</div>
+<script type="text/javascript">
+
+
+
+$(function(){
+	var socket = io.connect();
+	var $messageFrom = $('#messageFrom');
+	var $message = $('#message');
+	var $chat = $('#chat');
+	var $messageArea = $('#messageArea');
+	var $userFormArea = $('#userFormArea');
+	var $userForm = $('#userForm');
+	var $users = $('#users');
+	var $groups = $("#groups");
+	var $chat_history = $("#chat_history");
+	var $username = $('#username');
+	var $chat_historyFrom = $("#chat_historyFrom");
+	var $oldermsg = $("#oldermsg");
+	var $unameId = $("#unameId").val();
+
+	//single chat
+	var $privatechat = $('#privatechat');
+	var $privateFrom = $('#privateFrom');
+	var $pvtmessage = $('#pvtmessage');
+
+
+	// group message
+	$messageFrom.submit(function(e){
+		e.preventDefault();
+		var unameId=  $("#unameId").val();
+		var groupId=  $("#groupId").val();
+		 $("#to_user").html(unameId);
+
+		if(unameId==''){
+			alert('please select user to send message..');
+		}else{
+			if($message.val()==''){
+				alert('please enter message..');
+			}else{
+				//socket.emit('send message',$message.val(),to_user);
+
+				
+
+				socket.emit('eventToClient',{ msg: $message.val(), to_user: unameId,group_id: groupId });
+				$message.val('');
+				$unameId.val('');
+
+			}	
+		}
+	});
+
+// 
+
+	// private message
+	socket.on('new message',function(data){
+		console.log('in username->'+data.username);
+		console.log('in mew to->'+data.to);
+		console.log('in logged_user to->'+data.logged_user);
+
+		
+		$chat.append('<div class="well"><strong>'+data.users+'</strong>:'+data.msg+'</div>');
+		
+	});
+
+	// private messages list
+	socket.on('older message',function(data){
+		//console.log('in older message->'+data);
+
+		var htmlBind='';
+		$.each(JSON.parse(data), function(index,value){
+			htmlBind += '<li id="name'+value.txt_message+'" class="list-group-item"><strong>'+value.from_user+':</strong>'+value.txt_message+'</li>';
+		});
+		$oldermsg.html(htmlBind);
+		$("#chat_history").hide();
+	});
+
+
+
+
+
+	$userForm.submit(function(e){
+		e.preventDefault();
+		if($username.val()==''){
+			alert('Please enter user name');
+		}else{
+			socket.emit('new user',$username.val(),function(data){
+				if(data){
+					//console.log('data'+data);
+					$userFormArea.hide();
+					$messageArea.show();
+				}
+			});
+			$("#logged_in").html($username.val());
+			$username.val('');
+		}
+		
+	});
+
+
+	// get older messages
+
+	$chat_historyFrom.submit(function(e){
+		e.preventDefault();
+		var to_user1 = $("#to_user1").val();
+		var from_user1 = $("#from_user1").val();
+		var group_id = $("#groupId").val();
+
+		socket.emit('getHistory',{ to_user1: to_user1, from_user1: from_user1 ,group_id:group_id});
+				// if(data){
+				// 	//console.log('data'+data);
+				// 	$userFormArea.hide();
+				// 	$messageArea.show();
+				// }
+			
+			//$("#logged_in").html($username.val());
+				
+	});
+
+
+	//function to get users
+	socket.on('get users',function(ResultData){
+		var htmlBind='';
+		$.each(JSON.parse(ResultData), function(index,value){
+			htmlBind += '<li id="name'+value.name+'" class="list-group-item">'+value.name+'</li>';
+		});
+		$users.html(htmlBind);
+	});
+
+	// function to get groups
+	socket.on('get groups',function(ResultData){
+		var html='';
+
+		$.each(JSON.parse(ResultData), function(index,value){
+			html += '<li data-option="'+value.group_id+'" id="name'+value.group_name+'" class="list-group-item">'+value.group_name+'</li>';
+		});
+		$groups.html(html);
+	});
+
+	socket.on('get history',function(ResultData){
+		//console.log('asdasd'+ResultData);
+		 $.each(JSON.parse(ResultData), function(index,value){
+		 	htmlBind += '<li id="name'+value.to_user+'" class="list-group-item">'+value.to_user+'</li>';
+		 });
+		$chat_history.html(htmlBind);
+	});
+
+
+
+  
+});
+	$(document).ready(function(){
+		$("#messageFrom").hide();
+		$("#chat_history").hide();
+		$(document).on('click','.list-group-item',function(e){
+
+			//users styling
+			$('#users li').css({
+	            "color":"black",
+	            "font-weight":"normal",
+	            "font-size":"15px"
+	        });
+	        $(this).css({
+	            "color":"green",
+	            "font-weight":"bold",
+	            "font-size":"30px"
+	        });
+	        // grp styling
+
+	        $('#groups li').css({
+	            "color":"black",
+	            "font-weight":"normal",
+	            "font-size":"15px"
+	        });
+	        $(this).css({
+	            "color":"green",
+	            "font-weight":"bold",
+	            "font-size":"30px"
+	        });
+
+			var user= $(this).html();
+			var grup_id = $(this).attr('data-option');
+
+			//console.log('grup_id'+grup_id);
+			$("#name"+user+"" ).click(function(){
+		        $("#messageFrom").toggle();
+		        $("#unameId").val(user);
+		        $("#groupId").val(grup_id);
+		        $("#chat_history").show();
+		      var logged_in = $("#logged_in").html();
+		      // alert('logged_in'+logged_in);
+		       //alert('to_user'+user);
+		       $("#to_user1").val(user);
+		       $("#from_user1").val(logged_in);
+		       // socket.emit('get history',{ user_name: logged_in, to_user: user });
+		       //socket.send('get history',{ user_name: logged_in, to_user: user });
+		        
+		    });
+		});
+	});
+
+	
+	
+
+
+
+</script>
+
+</body>
+</html>
